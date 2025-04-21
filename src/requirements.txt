@@ -1,5 +1,7 @@
 requests
 pandas
+py4j==0.10.9.7
+pyspark==3.5.5
 python-dotenv
 google-cloud-pubsub
 google-cloud-bigquery
