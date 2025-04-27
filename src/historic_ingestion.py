@@ -5,7 +5,7 @@ historic_ingestion.py
 Reads CSV files from GCS, cleans and enriches the historical BySykkel trip data,
 and writes the result into BigQuery via the Spark–BigQuery connector.
 
-Configuration (with sensible defaults, so no extra job-args are required):
+Configuration (with defaults, so no extra job‐args are required):
   • INPUT_PATH   – GCS glob of CSVs (default: gs://data-management-2-arun-historic/*.csv)
   • OUTPUT_TABLE – BigQuery table (default: data_management_2_arun.historic_trips_cleaned)
   • TEMP_BUCKET  – GCS bucket for BigQuery temp files (default: gs://data-management-2-arun-temp)
@@ -34,7 +34,7 @@ def init_spark(app_name: str, temp_bucket: str) -> SparkSession:
     Pulls in the spark-bigquery connector automatically.
     """
     logging.info("Initializing Spark session")
-    spark = (
+    return (
         SparkSession.builder
           .appName(app_name)
           .config(
@@ -45,7 +45,6 @@ def init_spark(app_name: str, temp_bucket: str) -> SparkSession:
           .config("temporaryGcsBucket", temp_bucket)
           .getOrCreate()
     )
-    return spark
 
 # -----------------------------------------------------------------------------
 # SECTION 2: Read Input CSVs
@@ -70,23 +69,23 @@ def read_data(spark: SparkSession, input_path: str):
 # -----------------------------------------------------------------------------
 def clean_data(df):
     """
-    Drop malformed rows, parse timestamps and cast columns.
+    Drop rows missing key timestamps, parse timestamps, and cast types.
     """
     logging.info("Starting data cleaning")
-    # 3.1 Drop rows missing key columns
-    df_clean = df.dropna(subset=["ride_id", "started_at", "ended_at"])
+    # 3.1 Drop rows missing started_at or ended_at
+    df_clean = df.dropna(subset=["started_at", "ended_at"])
     # 3.2 Parse timestamp strings into TimestampType
     df_clean = (
         df_clean
-          .withColumn("start_time", to_timestamp(col("started_at"), "yyyy-MM-dd'T'HH:mm:ss"))
-          .withColumn("end_time",   to_timestamp(col("ended_at"),   "yyyy-MM-dd'T'HH:mm:ss"))
+          .withColumn("start_time", to_timestamp(col("started_at"), "yyyy-MM-dd HH:mm:ss.SSSXXX"))
+          .withColumn("end_time",   to_timestamp(col("ended_at"),   "yyyy-MM-dd HH:mm:ss.SSSXXX"))
     )
-    # 3.3 Cast numeric/dimension fields
+    # 3.3 Cast numeric and dimension fields
     df_clean = (
         df_clean
-          .withColumn("duration_sec",     col("duration_sec").cast("integer"))
-          .withColumn("start_station_id", col("start_station_id").cast("string"))
-          .withColumn("end_station_id",   col("end_station_id").cast("string"))
+          .withColumn("duration",           col("duration").cast("integer"))
+          .withColumn("start_station_id",   col("start_station_id").cast("string"))
+          .withColumn("end_station_id",     col("end_station_id").cast("string"))
     )
     logging.info("Data cleaning complete")
     return df_clean
