@@ -49,7 +49,7 @@ CHECKPOINT_LOCATION = os.getenv(
 )
 STATION_INFO_PATH = os.getenv(
     "STATION_INFO_PATH", 
-    "gs://data-management-2-arun/gbfs/oslo/station_information.json"
+    "gs://data-management-2-arun/gbfs/station_information.json"
 )
 
 # -----------------------------------------------------------------------------
