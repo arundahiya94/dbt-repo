@@ -1,155 +1,166 @@
+#!/usr/bin/env python3
+"""
+Cloud Function: fetch_gbfs_feeds
 
-"""Cloud Function: Fetch Oslo Bysykkel GBFS feeds and push to Pub/Sub.
+Fetches GBFS station metadata and status for Oslo Bysykkel and publishes them to Pub/Sub.
 
-Deployment
-----------
-gcloud functions deploy fetch_gbfs_feeds \
+Flow:
+1. Read config & initialize Pub/Sub client
+2. Discover feed URLs via the GBFS discovery endpoint
+3. For each desired feed:
+   a. Fetch JSON payload (with retries & timeouts)
+   b. Extract relevant fields
+   c. Publish to Pub/Sub, tagging with feed name
+4. Return HTTP 200 on success, 500 on any unhandled error
+
+Deployment:
+  gcloud functions deploy fetch_gbfs_feeds \
     --project=data-management-2-arun \
     --runtime=python310 \
     --region=europe-north1 \
     --trigger-http \
     --allow-unauthenticated \
-    --set-env-vars TOPIC_ID=gbfs-feed-topic,DISCOVERY_URL=https://api.entur.io/mobility/v2/gbfs/oslobysykkel/gbfs
-
-Schedule (every 5 min)
-----------------------
-gcloud scheduler jobs create http gbfs-oslo-job \
-    --schedule="*/5 * * * *" \
-    --uri=$(gcloud functions describe fetch_gbfs_feeds --region=europe-north1 --format='value(serviceConfig.uri)') \
-    --http-method=GET --oidc-service-account=<YOUR‑SA>@data-management-2-arun.iam.gserviceaccount.com
+    --set-env-vars \
+TOPIC_ID=gbfs-feed-topic,\
+DISCOVERY_URL=https://api.entur.io/mobility/v2/gbfs/oslobysykkel/gbfs
 """
 
+import os
 import json
 import logging
-import os
-from typing import Dict, List
+from typing import Dict, Any, List
 
 import requests
-from google.api_core.exceptions import GoogleAPIError
+from requests.exceptions import RequestException
 from google.cloud import pubsub_v1
+from google.api_core.exceptions import GoogleAPIError
+from flask import Request, make_response
 
 # -----------------------------------------------------------------------------
-# Configuration (override in the Cloud Function's environment variables)
+# Section 0: Configuration & Logging
 # -----------------------------------------------------------------------------
-PROJECT_ID: str = os.getenv("GCP_PROJECT", "data-management-2-arun")
-TOPIC_ID: str = os.getenv("TOPIC_ID", "gbfs-feed-topic")
-DISCOVERY_URL: str = os.getenv(
+PROJECT_ID    = os.getenv("GCP_PROJECT", "data-management-2-arun")
+TOPIC_ID      = os.getenv("TOPIC_ID", "gbfs-feed-topic")
+DISCOVERY_URL = os.getenv(
     "DISCOVERY_URL",
-    "https://api.entur.io/mobility/v2/gbfs/oslobysykkel/gbfs",
+    "https://api.entur.io/mobility/v2/gbfs/oslobysykkel/gbfs"
 )
+# Which feeds under "data.nb.feeds" to collect
 FEEDS_TO_COLLECT: List[str] = [
     "station_information",
     "station_status",
 ]
 
-# -----------------------------------------------------------------------------
-# Logging
-# -----------------------------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s"
 )
 logger = logging.getLogger("gbfs_fetch")
 
 # -----------------------------------------------------------------------------
-# Pub/Sub Publisher (reuse across invocations – Cloud Functions may keep the
-#   execution environment "warm", so this speeds things up)
+# Section 1: Pub/Sub helper (single, warm publisher instance)
 # -----------------------------------------------------------------------------
 _publisher: pubsub_v1.PublisherClient | None = None
 
-
-def _get_publisher() -> pubsub_v1.PublisherClient:
+def get_publisher() -> pubsub_v1.PublisherClient:
     global _publisher
     if _publisher is None:
         _publisher = pubsub_v1.PublisherClient()
     return _publisher
 
+def topic_path() -> str:
+    return get_publisher().topic_path(PROJECT_ID, TOPIC_ID)
 
-def _topic_path() -> str:
-    return _get_publisher().topic_path(PROJECT_ID, TOPIC_ID)
-
+def publish_message(payload: Dict[str, Any], attributes: Dict[str, str]) -> None:
+    """
+    Publish the JSON-serializable payload to Pub/Sub with given attributes.
+    Logs and suppresses exceptions to allow retries by Cloud Scheduler.
+    """
+    topic = topic_path()
+    data = json.dumps(payload).encode("utf-8")
+    try:
+        future = get_publisher().publish(topic, data, **attributes)
+        future.result(timeout=30)
+        logger.info("Published feed=%s to %s", attributes.get("feed"), topic)
+    except GoogleAPIError as e:
+        logger.error("Pub/Sub API error: %s", e, exc_info=True)
+    except Exception as e:
+        logger.exception("Unexpected error publishing to Pub/Sub: %s", e)
 
 # -----------------------------------------------------------------------------
-# GBFS helpers
+# Section 2: GBFS Discovery & Fetch
 # -----------------------------------------------------------------------------
-def fetch_json(url: str) -> dict:
-    """GET *url* and return JSON (raise for HTTP/connection errors)."""
-    logger.debug("Fetching %s", url)
-    resp = requests.get(url, timeout=10)
+def fetch_json(url: str, timeout: int = 10) -> Dict[str, Any]:
+    """
+    GET the URL and return the parsed JSON body.
+    Raises RequestException on network/HTTP errors.
+    """
+    logger.debug("Fetching URL: %s", url)
+    resp = requests.get(url, timeout=timeout)
     resp.raise_for_status()
     return resp.json()
 
-
-def discover_feed_urls(discovery_url: str) -> Dict[str, str]:
-    """Return a mapping {feed_name: feed_url}."""
-    discovery = fetch_json(discovery_url)
-    feeds = discovery.get("data", {}).get("nb", {}).get("feeds", [])
-    mapping: Dict[str, str] = {f["name"]: f["url"] for f in feeds if "url" in f}
-    logger.info("Discovered %d feeds at %s", len(mapping), discovery_url)
+def discover_feeds(discovery_url: str) -> Dict[str, str]:
+    """
+    Call the GBFS discovery endpoint and build a map of feed_name -> feed_url.
+    """
+    data = fetch_json(discovery_url).get("data", {}).get("nb", {}).get("feeds", [])
+    mapping = {entry["name"]: entry["url"] for entry in data if entry.get("name") and entry.get("url")}
+    logger.info("Discovered %d GBFS feeds", len(mapping))
     return mapping
 
-
 # -----------------------------------------------------------------------------
-# Pub/Sub publishing
+# Section 3: Cloud Function Entry Point
 # -----------------------------------------------------------------------------
-def publish_payload(payload: dict, attributes: dict | None = None) -> None:
-    """Publish *payload* to Pub/Sub with optional attributes."""
-    topic = _topic_path()
-    data_bytes: bytes = json.dumps(payload).encode("utf-8")
+def fetch_gbfs_feeds(request: Request):
+    """
+    HTTP-triggered Cloud Function.
+    Iterates FEEDS_TO_COLLECT, fetches each feed's JSON, wraps it with metadata,
+    and publishes to Pub/Sub.
+    """
+    logger.info("=== fetch_gbfs_feeds invoked ===")
     try:
-        future = _get_publisher().publish(topic, data=data_bytes, **(attributes or {}))
-        future.result(timeout=30)  # Block until the message is actually published
-        logger.info("Published message to %s with %s attr", topic, attributes or {})
-    except GoogleAPIError as exc:
-        logger.error("Pub/Sub publish failed: %s", exc, exc_info=True)
-        # Do not raise: let the function continue; Cloud Scheduler can retry
-    except Exception:  # noqa: BLE001
-        logger.exception("Unexpected error while publishing to Pub/Sub")
+        # 3.1 Discover feed URLs
+        feed_map = discover_feeds(DISCOVERY_URL)
 
-
-# -----------------------------------------------------------------------------
-# Cloud Function entry point
-# -----------------------------------------------------------------------------
-def fetch_gbfs_feeds(request):  # noqa: D401  (Google Cloud Functions signature)
-    """HTTP‑triggered entry point."""
-    logger.info("GBFS fetch triggered")
-    try:
-        feed_urls = discover_feed_urls(DISCOVERY_URL)
-
-        for feed in FEEDS_TO_COLLECT:
-            url = feed_urls.get(feed)
-            if not url:
-                logger.warning("Feed '%s' not advertised in discovery; skipping", feed)
+        # 3.2 Loop through feeds of interest
+        for feed_name in FEEDS_TO_COLLECT:
+            feed_url = feed_map.get(feed_name)
+            if not feed_url:
+                logger.warning("Feed '%s' not found in discovery; skipping", feed_name)
                 continue
 
+            # 3.3 Fetch the feed JSON
             try:
-                feed_json = fetch_json(url)
-            except requests.RequestException as exc:
-                logger.error("Could not fetch %s: %s", feed, exc, exc_info=True)
+                feed_json = fetch_json(feed_url)
+            except RequestException as e:
+                logger.error("Failed to fetch %s (%s): %s", feed_name, feed_url, e, exc_info=True)
                 continue
 
+            # 3.4 Build message envelope
             message = {
-                "feed_name": feed,
-                "source_url": url,
+                "feed_name":    feed_name,
+                "source_url":   feed_url,
                 "last_updated": feed_json.get("last_updated"),
-                "ttl": feed_json.get("ttl"),
-                "payload": feed_json.get("data"),
+                "ttl":          feed_json.get("ttl"),
+                "data":         feed_json.get("data"),  # raw GBFS payload
             }
 
-            publish_payload(message, attributes={"feed": feed})
+            # 3.5 Publish to Pub/Sub
+            publish_message(message, attributes={"feed": feed_name})
 
-        return ("OK", 200)
+        # 3.6 Return HTTP 200
+        return make_response(("OK", 200))
 
-    except Exception:  # noqa: BLE001
-        logger.exception("Unhandled error in fetch_gbfs_feeds")
-        return ("Internal Server Error", 500)
-
+    except Exception as e:
+        logger.exception("Unhandled error in fetch_gbfs_feeds: %s", e)
+        return make_response(("Internal Server Error", 500))
 
 # -----------------------------------------------------------------------------
-# Local test harness (python gbfs_fetch.py)
+# Section 4: Local Debug Harness (optional)
 # -----------------------------------------------------------------------------
 if __name__ == "__main__":
-    class _DummyReq:  # noqa: D401
+    class DummyRequest:
         args = {}
-
-    fetch_gbfs_feeds(_DummyReq())
+    resp, code = fetch_gbfs_feeds(DummyRequest())
+    print(f"Local run returned {code}: {resp}")
