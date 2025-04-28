@@ -56,16 +56,24 @@ STATION_INFO_PATH = os.getenv(
 # SECTION 1: Spark Session Initialization
 # -----------------------------------------------------------------------------
 def init_spark(app_name: str, temp_bucket: str) -> SparkSession:
+    """
+    Initialize a SparkSession, pulling in only the BigQuery 
+    and Pub/Sub connectors via Maven coordinates.
+    """
     logging.info("Initializing Spark session")
     return (
         SparkSession.builder
             .appName(app_name)
-            .config("spark.jars.packages",
-                    ",".join([
-                      "com.google.cloud.spark:spark-bigquery-with-dependencies_2.12:0.36.0",
-                      "org.apache.bahir:spark-sql-streaming-pubsub_2.12:2.4.0"
-                    ]))
-            .config("spark.sql.catalog.spark_bigquery", "com.google.cloud.spark.bigquery")
+            # .config(
+            #     "spark.jars.packages",
+            #     ",".join([
+            #         # BigQuery connector
+            #         "com.google.cloud.spark:spark-bigquery-with-dependencies_2.12:0.36.0",
+            #         # Structured‐Streaming Pub/Sub connector
+            #         "org.apache.bahir:spark-sql-streaming-pubsub_2.12:2.4.0",
+            #     ])
+            # )
+            # .config("spark.sql.catalog.spark_bigquery", "com.google.cloud.spark.bigquery")
             .config("temporaryGcsBucket", temp_bucket)
             .getOrCreate()
     )
