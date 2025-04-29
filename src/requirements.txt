@@ -1,8 +1,7 @@
 requests
 pandas
-py4j
-pyspark
 python-dotenv
 google-cloud-bigquery
 google-cloud-logging
 google-cloud-pubsub
+google-cloud-storage
