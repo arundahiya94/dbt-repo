@@ -1,0 +1,21 @@
+version: 2
+
+sources:
+
+  - name: gbfs
+    description: "GBFS feed tables landed in BigQuery (raw JSON payloads)."
+    database: "{{ env_var('DBT_TARGET_DATABASE') }}"
+    schema: data_management_2_arun
+    tables:
+      - name: raw_station_status
+        description: "Fast‐changing station availability snapshots (every ~15s)."
+      - name: raw_station_information
+        description: "Slow‐changing station metadata (location, capacity, etc.)."
+
+  - name: trips
+    description: "Historic bike‐trip records cleaned and loaded into BigQuery."
+    database: "{{ env_var('DBT_TARGET_DATABASE') }}"
+    schema: data_management_2_arun
+    tables:
+      - name: raw_historic_trips
+        description: "One row per past trip (start/end times, station IDs, geo)."
