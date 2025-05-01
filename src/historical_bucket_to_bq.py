@@ -7,7 +7,7 @@ and writes the result into BigQuery via the Spark–BigQuery connector.
 
 Configuration (with defaults, so no extra job‐args are required):
   • INPUT_PATH   – GCS glob of CSVs (default: gs://data-management-2-arun-historic/*.csv)
-  • OUTPUT_TABLE – BigQuery table (default: data_management_2_arun.historic_trips_cleaned)
+  • OUTPUT_TABLE – BigQuery table (default: data_management_2_arun.raw_historic_trips)
   • TEMP_BUCKET  – GCS bucket for BigQuery temp files (default: gs://data-management-2-arun-temp)
 
 You can override any of these by setting the corresponding environment variable.
@@ -22,7 +22,7 @@ from pyspark.sql.functions import col, to_timestamp
 # SECTION 0: Configuration from environment with defaults
 # -----------------------------------------------------------------------------
 INPUT_PATH   = os.getenv("INPUT_PATH",   "gs://data-management-2-arun-historic/*.csv")
-OUTPUT_TABLE = os.getenv("OUTPUT_TABLE", "data_management_2_arun.historic_trips_cleaned")
+OUTPUT_TABLE = os.getenv("OUTPUT_TABLE", "data_management_2_arun.raw_historic_trips")
 TEMP_BUCKET  = os.getenv("TEMP_BUCKET",  "gs://data-management-2-arun-temp")
 
 # -----------------------------------------------------------------------------
