@@ -20,4 +20,4 @@ with stations as (
 
 select *
 from stations
-order by station_id;
+order by station_id
