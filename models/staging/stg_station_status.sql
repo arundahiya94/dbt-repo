@@ -25,4 +25,4 @@ select
   to_timestamp(last_updated)        as feed_updated_at,
   version,
   ttl
-from source;
+from source
