@@ -3,13 +3,12 @@
 with src as (
   select
     ingest_datetime,
-    last_updated  as feed_last_updated,
+    last_updated      as feed_last_updated,
     ttl,
     version,
-
-    -- extract the JSON array of stations
-    json_extract(data_json, '$.stations')   as stations_json
-  from {{ source('gbfs','raw_station_information') }}
+    -- get an ARRAY<JSON> of station objects
+    JSON_EXTRACT_ARRAY(data_json, '$.stations')  as stations_json
+  from `data-management-2-arun`.`data_management_2_arun`.`raw_station_information`
 ),
 
 exploded as (
@@ -18,32 +17,29 @@ exploded as (
     feed_last_updated,
     ttl,
     version,
-
-    -- each station as JSON
     station_json
   from src,
-  unnest( cast(json_extract_array(stations_json) as array<json>) ) as station_json
+  unnest(stations_json) as station_json   -- station_json is now JSON
 ),
 
 parsed as (
   select
     ingest_datetime,
-    timestamp_seconds(feed_last_updated)  as feed_updated_at,
+    timestamp_seconds(feed_last_updated)    as feed_updated_at,
     ttl,
     version,
 
-    -- drill into each station JSON object
-    station_json:station_id                as station_id,
-    station_json:name[0].text              as station_name,
-    station_json:lat                       as lat,
-    station_json:lon                       as lon,
-    station_json:address                   as address,
-    station_json:cross_street              as cross_street,
-    station_json:capacity                  as capacity,
-    station_json:is_virtual_station        as is_virtual_station,
-    station_json:rental_uris.android       as uri_android,
-    station_json:rental_uris.ios           as uri_ios,
-    station_json:rental_uris.web           as uri_web
+    JSON_EXTRACT_SCALAR(station_json, '$.station_id')                    as station_id,
+    JSON_EXTRACT_SCALAR(station_json, '$.name')                          as station_name,
+    cast(JSON_EXTRACT_SCALAR(station_json, '$.lat')  as float64)       as lat,
+    cast(JSON_EXTRACT_SCALAR(station_json, '$.lon')  as float64)       as lon,
+    JSON_EXTRACT_SCALAR(station_json, '$.address')                      as address,
+    JSON_EXTRACT_SCALAR(station_json, '$.cross_street')                 as cross_street,
+    cast(JSON_EXTRACT_SCALAR(station_json, '$.capacity') as int64)     as capacity,
+    JSON_EXTRACT_SCALAR(station_json, '$.is_virtual_station') = 'true' as is_virtual_station,
+    JSON_EXTRACT_SCALAR(station_json, '$.rental_uris.android')         as uri_android,
+    JSON_EXTRACT_SCALAR(station_json, '$.rental_uris.ios')             as uri_ios,
+    JSON_EXTRACT_SCALAR(station_json, '$.rental_uris.web')             as uri_web
 
   from exploded
 )
