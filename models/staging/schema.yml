@@ -1,0 +1,58 @@
+version: 2
+
+models:
+  - name: stg_station_status
+    description: "Flattened station status snapshots."
+    columns:
+      - name: station_id
+        description: "Unique station identifier."
+        tests:
+          - not_null
+      - name: reported_at
+        description: "When the station reported its status."
+        tests:
+          - not_null
+      - name: bikes_available
+        description: "Number of bikes available at report time."
+      - name: docks_available
+        description: "Empty docks available." 
+
+  - name: stg_station_information
+    description: "Flattened station metadata."
+    columns:
+      - name: station_id
+        tests:
+          - not_null
+          - unique
+      - name: station_name
+        tests:
+          - not_null
+      - name: lat
+        tests:
+          - not_null
+      - name: lon
+        tests:
+          - not_null
+      - name: capacity
+        description: "Total dock capacity."
+
+  - name: stg_historic_trips
+    description: "Flattened historic trips."
+    columns:
+      - name: started_at
+        tests:
+          - not_null
+      - name: ended_at
+        tests:
+          - not_null
+      - name: duration_s
+        tests:
+          - not_null
+      - name: start_station_id
+        tests:
+          - not_null
+      - name: end_station_id
+        tests:
+          - not_null
+      - name: trip_date
+        description: "Date of trip start."
