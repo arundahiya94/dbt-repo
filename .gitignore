@@ -183,3 +183,7 @@ logs/
 
 # Ignore Json files
 *.json
+
+
+#Ignore unwanted folder
+/demo_test
