@@ -1,43 +1,89 @@
+# ────────────────────────────────────────────────────────────────────────────────
+# dbt_project.yml
+#
+# Project:        data_management_2_arun
+# Purpose:        Defines how dbt builds models into BigQuery,
+#                 partitioned into raw, staging, and analytics layers.
+# Created:        2025-05-02
+# ────────────────────────────────────────────────────────────────────────────────
 
-# Name your project! Project names should contain only lowercase characters
-# and underscores. A good package name should reflect your organization's
-# name or the intended use of these models
-name: 'online_shop'
+# 1) Project identity — must be lowercase, underscore
+name: 'data_management_2_arun'
 version: '1.0.0'
 config-version: 2
 
-# This setting configures which "profile" dbt uses for this project.
+# 2) Profile — references your ~/.dbt/profiles.yml for BigQuery credentials
 profile: 'default'
 
-# These configurations specify where dbt should look for different types of files.
-# The `model-paths` config, for example, states that models in this project can be
-# found in the "models/" directory. You probably won't need to change these!
-model-paths: ["models"]
+# 3) File locations — you generally won’t change these
+model-paths:    ["models"]
 analysis-paths: ["analyses"]
-test-paths: ["tests"]
-seed-paths: ["seeds"]
-macro-paths: ["macros"]
+test-paths:     ["tests"]
+seed-paths:     ["seeds"]
+macro-paths:    ["macros"]
 snapshot-paths: ["snapshots"]
 
-target-path: "target"  # directory which will store compiled SQL files
-clean-targets:         # directories to be removed by `dbt clean`
+# 4) Target directories for compiled artifacts
+target-path: "target"       # compiled SQL, manifest.json, etc.
+clean-targets:             # directories removed by `dbt clean`
   - "target"
   - "dbt_packages"
 
-
-# Configuring models
-# Full documentation: https://docs.getdbt.com/docs/configuring-models
-
-# In dbt, the default materialization for a model is a view. This means, when you run 
-# dbt run or dbt build, all of your models will be built as a view in your data platform. 
-# The configuration below will override this setting for models in the example folder to 
-# instead be materialized as tables. Any models you add to the root of the models folder will 
-# continue to be built as views. These settings can be overridden in the individual model files
-# using the `{{ config(...) }}` macro.
+# ────────────────────────────────────────────────────────────────────────────────
+# 5) Model configurations by folder
+#
+# We use three BigQuery datasets to isolate each layer:
+#   • data_management_2_arun__raw       ← source tables (loaded externally)
+#   • data_management_2_arun__stg       ← staging views
+#   • data_management_2_arun__analytics ← dimension & fact tables
+# ────────────────────────────────────────────────────────────────────────────────
 
 models:
-  online_shop:
-    +materialized: table
-    # Applies to all files under models/example/
-    # example:
-    #   +materialized: view
+  # Top‐level key must match the project name above
+  data_management_2_arun:
+    
+    # ──────────────── Raw sources ────────────────
+    # These are your landing tables (raw JSON payloads). We never materialize SQL here.
+    src:
+      +materialized: ephemeral
+      +schema: data_management_2_arun
+
+    # ────────────── Staging layer ───────────────
+    # Flattened, cleaned staging views that feed your dims & facts.
+    staging:
+      +materialized: view
+      +schema: data_management_2_arun__stg
+
+    # ──────────── Dimension tables ───────────────
+    # Persisted tables for your dimensional lookups (e.g. stations, date).
+    dimensions:
+      +materialized: table
+      +schema: data_management_2_arun__analytics
+
+    # ────────────── Fact tables ──────────────────
+    # Persisted tables for your business metrics (status history, trips).
+    facts:
+      +materialized: table
+      +schema: data_management_2_arun__analytics
+
+    # ─────────── Default for any other models ───────
+    # If you create models outside src/staging/dimensions/facts,
+    # they will be built as views in the default analytics schema.
+    +materialized: view
+
+# ────────────────────────────────────────────────────────────────────────────────
+# Notes:
+# • Make sure the three datasets exist in BigQuery:
+#     data_management_2_arun
+#     data_management_2_arun__stg
+#     data_management_2_arun__analytics
+#
+# • Your BigQuery profile (in ~/.dbt/profiles.yml) should point at the
+#   project 'data-management-2-arun' and can use any default dataset;
+#   overrides above will direct specific models into the correct datasets.
+#
+# • Run your pipeline:
+#     dbt run
+#     dbt test
+#     dbt docs generate
+# ────────────────────────────────────────────────────────────────────────────────
