@@ -1,7 +1,6 @@
 version: 2
 
 sources:
-
   - name: gbfs
     description: "GBFS feed tables landed in BigQuery (raw JSON payloads)."
     database: "{{ env_var('DBT_TARGET_DATABASE') }}"
