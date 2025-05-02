@@ -33,9 +33,9 @@ clean-targets:             # directories removed by `dbt clean`
 # 5) Model configurations by folder
 #
 # We use three BigQuery datasets to isolate each layer:
-#   • data_management_2_arun__raw       ← source tables (loaded externally)
-#   • data_management_2_arun__stg       ← staging views
-#   • data_management_2_arun__analytics ← dimension & fact tables
+#   • raw       ← source tables (loaded externally)
+#   • stg       ← staging views
+#   • analytics ← dimension & fact tables
 # ────────────────────────────────────────────────────────────────────────────────
 
 models:
@@ -52,19 +52,19 @@ models:
     # Flattened, cleaned staging views that feed your dims & facts.
     staging:
       +materialized: view
-      +schema: data_management_2_arun__stg
+      +schema: stg
 
     # ──────────── Dimension tables ───────────────
     # Persisted tables for your dimensional lookups (e.g. stations, date).
     dimensions:
       +materialized: table
-      +schema: data_management_2_arun__analytics
+      +schema: analytics
 
     # ────────────── Fact tables ──────────────────
     # Persisted tables for your business metrics (status history, trips).
     facts:
       +materialized: table
-      +schema: data_management_2_arun__analytics
+      +schema: analytics
 
     # ─────────── Default for any other models ───────
     # If you create models outside src/staging/dimensions/facts,
@@ -74,9 +74,9 @@ models:
 # ────────────────────────────────────────────────────────────────────────────────
 # Notes:
 # • Make sure the three datasets exist in BigQuery:
-#     data_management_2_arun
-#     data_management_2_arun__stg
-#     data_management_2_arun__analytics
+#     raw
+#     stg
+#     analytics
 #
 # • Your BigQuery profile (in ~/.dbt/profiles.yml) should point at the
 #   project 'data-management-2-arun' and can use any default dataset;
