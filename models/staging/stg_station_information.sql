@@ -8,7 +8,7 @@ with
             version,
             -- get an ARRAY<JSON> of station objects
             json_extract_array(data_json, '$.stations') as stations_json
-        from {{ source("gbfs", "raw_station_information") }},
+        from {{ source("gbfs", "raw_station_information") }}
     ),
 
     exploded as (
