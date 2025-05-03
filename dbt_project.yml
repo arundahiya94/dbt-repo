@@ -65,6 +65,12 @@ models:
       +materialized: table
       +schema: analytics
 
+    # ────────────── Mart tables ──────────────────
+    # Persisted tables for your business metrics (status history, trips).
+    marts:
+      +materialized: table
+      +schema: analytics
+
     # ─────────── Default for any other models ───────
     # If you create models outside src/staging/dimensions/facts,
     # they will be built as views in the default analytics schema.
