@@ -14,45 +14,94 @@ models:
           - not_null
       - name: bikes_available
         description: "Number of bikes available at report time."
+        tests:
+          - not_null
       - name: docks_available
-        description: "Empty docks available." 
+        description: "Empty docks available."
+        tests:
+          - not_null
+      - name: feed_updated_at
+        description: "Epoch-derived timestamp when the feed was last updated."
+        tests:
+          - not_null
+      - name: ingest_at
+        description: "Timestamp when this row was ingested."
+        tests:
+          - not_null
+      - name: is_installed
+        description: "1 if station hardware is installed."
+      - name: is_renting
+        description: "1 if station is currently renting bikes."
+      - name: is_returning
+        description: "1 if station is currently accepting returns."
 
   - name: stg_station_information
     description: "Flattened station metadata."
     columns:
       - name: station_id
+        description: "Unique station identifier."
         tests:
           - not_null
           - unique
       - name: station_name
+        description: "Primary human-readable station name."
         tests:
           - not_null
       - name: lat
+        description: "Latitude of station."
         tests:
           - not_null
       - name: lon
+        description: "Longitude of station."
         tests:
           - not_null
+      - name: address
+        description: "Street address of station."
+      - name: cross_street
+        description: "Nearest cross street."
       - name: capacity
         description: "Total dock capacity."
+      - name: is_virtual_station
+        description: "True if station is virtual (no physical docks)."
+      - name: uri_android
+        description: "Android deep link for station rental UI."
+      - name: uri_ios
+        description: "iOS deep link for station rental UI."
+      - name: uri_web
+        description: "Web URL for station information."
 
   - name: stg_historic_trips
     description: "Flattened historic trips."
     columns:
       - name: started_at
+        description: "Timestamp when the trip started."
         tests:
           - not_null
       - name: ended_at
+        description: "Timestamp when the trip ended."
         tests:
           - not_null
       - name: duration_s
+        description: "Reported trip duration in seconds."
+        tests:
+          - not_null
+      - name: computed_duration_s
+        description: "Computed trip duration in seconds (ended_at - started_at)."
         tests:
           - not_null
       - name: start_station_id
+        description: "Station where trip began."
         tests:
           - not_null
       - name: end_station_id
+        description: "Station where trip ended."
         tests:
           - not_null
       - name: trip_date
         description: "Date of trip start."
+        tests:
+          - not_null
+      - name: trip_hour
+        description: "Hour-truncated timestamp of trip start."
+        tests:
+          - not_null

@@ -8,24 +8,24 @@
 # ────────────────────────────────────────────────────────────────────────────────
 
 # 1) Project identity — must be lowercase, underscore
-name: 'data_management_2_arun'
-version: '1.0.0'
+name: "data_management_2_arun"
+version: "1.0.0"
 config-version: 2
 
 # 2) Profile — references your ~/.dbt/profiles.yml for BigQuery credentials
-profile: 'default'
+profile: "default"
 
 # 3) File locations — you generally won’t change these
-model-paths:    ["models"]
+model-paths: ["models"]
 analysis-paths: ["analyses"]
-test-paths:     ["tests"]
-seed-paths:     ["seeds"]
-macro-paths:    ["macros"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
 snapshot-paths: ["snapshots"]
 
 # 4) Target directories for compiled artifacts
-target-path: "target"       # compiled SQL, manifest.json, etc.
-clean-targets:             # directories removed by `dbt clean`
+target-path: "target" # compiled SQL, manifest.json, etc.
+clean-targets: # directories removed by `dbt clean`
   - "target"
   - "dbt_packages"
 
@@ -41,7 +41,6 @@ clean-targets:             # directories removed by `dbt clean`
 models:
   # Top‐level key must match the project name above
   data_management_2_arun:
-    
     # ──────────────── Raw sources ────────────────
     # These are your landing tables (raw JSON payloads). We never materialize SQL here.
     src:
@@ -70,7 +69,6 @@ models:
     # If you create models outside src/staging/dimensions/facts,
     # they will be built as views in the default analytics schema.
     +materialized: view
-
 # ────────────────────────────────────────────────────────────────────────────────
 # Notes:
 # • Make sure the three datasets exist in BigQuery:
