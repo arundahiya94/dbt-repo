@@ -1,0 +1,12 @@
+requests
+pandas
+python-dotenv
+google-cloud-bigquery
+google-cloud-logging
+google-cloud-pubsub
+google-cloud-storage
+apache-airflow
+apache-airflow-providers-google
+pyspark
+dbt-core
+dbt-bigquery
