@@ -24,7 +24,7 @@ select
     extract(year from day) as year,
     extract(month from day) as month,
     extract(day from day) as day_of_month,
-    extract(dayofweek from day) - 1 as weekday,  -- 0=Sunday, …, 6=Saturday
+    extract(dayofweek from day) as weekday,  -- 1=Sunday, …, 7=Saturday
     format_date('%Y%m%d', day) as date_int
 from all_dates
 order by day
