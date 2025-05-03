@@ -1,25 +1,32 @@
+-- models/facts/fact_station_status.sql
 {{ config(materialized="incremental", unique_key="snapshot_id") }}
 
 with
-    src as (
+    status_src as (
         select
             *,
-            -- one snapshot per station‐timestamp
-            md5(concat(cast(feed_timestamp as string), station_id)) as snapshot_id
+            -- stable PK per station‐timestamp
+            md5(concat(cast(feed_updated_at as string), station_id)) as snapshot_id
         from {{ ref("stg_station_status") }}
+    ),
+
+    info_src as (
+        select station_id, is_virtual_station from {{ ref("stg_station_information") }}
     )
 
 select
-    snapshot_id,
-    feed_timestamp,
-    date(feed_timestamp) as status_date,
-    timestamp_trunc(feed_timestamp, hour) as status_hour,
-    station_id,
-    num_bikes_available,
-    num_docks_available,
-    is_virtual_station
-from src
+    s.snapshot_id,
+    s.feed_updated_at as status_timestamp,
+    date(s.feed_updated_at) as status_date,
+    timestamp_trunc(s.feed_updated_at, hour) as status_hour,
+    s.station_id,
+    s.bikes_available,
+    s.docks_available,
+    coalesce(i.is_virtual_station, false) as is_virtual_station
+from status_src s
+
+left join info_src i using (station_id)
 
 {% if is_incremental() %}
-    where snapshot_id not in (select snapshot_id from {{ this }})
+    where s.snapshot_id not in (select snapshot_id from {{ this }})
 {% endif %}

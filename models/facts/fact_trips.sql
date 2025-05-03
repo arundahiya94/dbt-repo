@@ -1,17 +1,17 @@
-{{ config(materialized="incremental", unique_key="trip_id") }}
+-- models/facts/fact_trips.sql
+{{ config(materialized="table") }}
 
 with
     src as (
         select
             *,
-            -- synthetic primary key for dedup/incremental
+            -- optional: build a surrogate PK for each trip
             md5(
                 concat(
                     cast(started_at as string),
                     cast(ended_at as string),
-                    start_station_id,
-                    end_station_id,
-                    cast(duration_s as string)
+                    cast(start_station_id as string),
+                    cast(end_station_id as string)
                 )
             ) as trip_id
         from {{ ref("stg_historic_trips") }}
@@ -21,14 +21,14 @@ select
     trip_id,
     started_at,
     ended_at,
-    duration_s,
+    duration_s as raw_duration_s,
     computed_duration_s,
-    date(started_at) as trip_date,
-    timestamp_trunc(started_at, hour) as trip_hour,
+    trip_date,
+    trip_hour,
     start_station_id,
-    end_station_id
+    end_station_id,
+    start_lat,
+    start_lon,
+    end_lat,
+    end_lon
 from src
-
-{% if is_incremental() %}
-    where trip_id not in (select trip_id from {{ this }})
-{% endif %}
