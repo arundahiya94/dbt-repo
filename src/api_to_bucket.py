@@ -170,11 +170,11 @@ def fetch_gbfs_feeds(request: Request):  # noqa: D401, ANN001
             archive_to_gcs(feed_json, feed=feed, now=now)
 
         logger.info("⇠ fetch_gbfs_feeds completed ✓")
-        return make_response(("OK", 200))
+        return "OK", 200
 
     except Exception as exc:  # noqa: BLE001
         logger.exception("Unhandled exception | %s", exc)
-        return make_response(("Internal Server Error", 500))
+        return "Internal Server Error", 500
 
 # =============================================================================
 # 4 – Local debug harness (optional)
