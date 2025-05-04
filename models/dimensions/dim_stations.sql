@@ -5,7 +5,7 @@ with
     stations as (
         select distinct
             station_id,
-            station_name as name,
+            station_name,
             lat,
             lon,
             address,
