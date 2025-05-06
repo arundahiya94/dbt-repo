@@ -33,12 +33,21 @@ with
 
 select
     a.*,
+
+    -- cleaned names
     ds_start.station_name as cleaned_start_name,
-    ds_end.station_name as cleaned_end_name
+    ds_end.station_name as cleaned_end_name,
+
+    -- start station coordinates from the dim
+    ds_start.lat as start_station_lat,
+    ds_start.lon as start_station_lon,
+
+    -- end station coordinates from the dim
+    ds_end.lat as end_station_lat,
+    ds_end.lon as end_station_lon
+
 from agg a
 
--- if you still want the “cleaned” dim names in addition to the raw feed names
-left join
-    {{ ref("dim_stations") }} ds_start on a.start_station_id = ds_start.station_id
+left join {{ ref("dim_stations") }} ds_start on a.start_station_id = ds_start.station_id
 
 left join {{ ref("dim_stations") }} ds_end on a.end_station_id = ds_end.station_id
