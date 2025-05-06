@@ -24,3 +24,4 @@ select
     timestamp_trunc(started_at, hour) as trip_hour,
     timestamp_diff(ended_at, started_at, second) as computed_duration_s
 from source
+
